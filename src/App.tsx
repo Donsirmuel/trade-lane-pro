@@ -11,6 +11,7 @@ import Transactions from "./pages/Transactions";
 import TransactionDetails from "./pages/TransactionDetails";
 import Settings from "./pages/Settings";
 import Availability from "./pages/Availability";
+import BroadcastMessages from "./pages/BroadcastMessages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,9 +28,10 @@ const App = () => (
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/:id" element={<OrderDetails />} />
           <Route path="/transactions" element={<Transactions />} />
-          <Route path="/transactions/:id" element={<TransactionDetails />} />
+          <Route path="/transaction/:id" element={<TransactionDetails />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/availability" element={<Availability />} />
+          <Route path="/broadcast-messages" element={<BroadcastMessages />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

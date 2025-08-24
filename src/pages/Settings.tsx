@@ -16,7 +16,7 @@ const Settings = () => {
   const { toast } = useToast();
   const [profileImage, setProfileImage] = useState("");
   const [userName, setUserName] = useState("Alex Thompson");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("naira");
   const [theme, setTheme] = useState("dark");
 
   // Mock bank accounts
@@ -54,7 +54,7 @@ const Settings = () => {
   };
 
   const getCurrencySymbol = (curr: string) => {
-    return curr === "USD" ? "$" : "₦";
+    return "₦";
   };
 
   return (
@@ -121,8 +121,7 @@ const Settings = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="USD">US Dollar (USD)</SelectItem>
-                  <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                  <SelectItem value="naira">Nigerian Naira (₦)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -278,22 +277,35 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Vendor Availability */}
+        {/* Vendor Availability & Broadcast Messages */}
         <Card className="bg-gradient-card border-border">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <SettingsIcon className="h-5 w-5" />
-              <span>Vendor Availability</span>
+              <span>Vendor Management</span>
             </CardTitle>
-            <CardDescription>Manage your availability status for customers</CardDescription>
+            <CardDescription>Manage your availability and customer communications</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link to="/availability">
-              <Button variant="outline" className="border-border hover:bg-secondary">
-                Set Availability
-                <ArrowRight className="h-4 w-4 ml-2" />
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button asChild variant="ghost" className="justify-start h-auto p-4 mb-2">
+                <Link to="/availability">
+                  <div>
+                    <p className="font-medium">Set Availability</p>
+                    <p className="text-sm text-muted-foreground">Manage when you're available for orders</p>
+                  </div>
+                </Link>
               </Button>
-            </Link>
+              
+              <Button asChild variant="ghost" className="justify-start h-auto p-4">
+                <Link to="/broadcast-messages">
+                  <div>
+                    <p className="font-medium">Broadcast Messages</p>
+                    <p className="text-sm text-muted-foreground">Send messages to all your customers</p>
+                  </div>
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

@@ -16,18 +16,33 @@ const OrderDetails = () => {
   const [declineReason, setDeclineReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Mock data
-  const order = {
-    id: id || "ORD001",
-    date: "2024-01-15 14:30:25",
-    asset: "BTC",
-    amount: "0.5",
-    value: "$23,500",
-    type: "Buy",
-    customerDetails: "First Bank Account: 1234567890, John Doe",
-    remarks: "Please confirm transaction within 30 minutes. I will send payment immediately after receiving your account details.",
-    status: "Pending"
+  // Mock data - different orders based on ID
+  const mockOrders = {
+    "ORD001": {
+      id: "ORD001",
+      date: "2024-01-15 14:30:25",
+      asset: "BTC",
+      amount: "0.5",
+      value: "₦23,500,000",
+      type: "Buy",
+      customerDetails: "First Bank Account: 1234567890, John Doe",
+      remarks: "Please confirm transaction within 30 minutes. I will send payment immediately after receiving your account details.",
+      status: "Pending"
+    },
+    "ORD002": {
+      id: "ORD002",
+      date: "2024-01-15 15:20:10",
+      asset: "ETH",
+      amount: "2.0",
+      value: "₦8,400,000",
+      type: "Sell",
+      customerDetails: "0x742d35Cc6e5f3e1234567890abcdef1234567890",
+      remarks: "Please send ETH to my wallet address above. Will confirm payment within 15 minutes.",
+      status: "Pending"
+    }
   };
+
+  const order = mockOrders[id as keyof typeof mockOrders] || mockOrders["ORD001"];
 
   // Mock vendor settings
   const bankAccounts = [
@@ -154,31 +169,31 @@ const OrderDetails = () => {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Customer Details */}
-          <Card className="bg-gradient-card border-border">
-            <CardHeader>
-              <CardTitle>Customer Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Payment Details</p>
-                <div className="p-3 bg-secondary/50 rounded-lg">
-                  <p className="text-sm">{order.customerDetails}</p>
-                </div>
+        {/* Customer Information */}
+        <Card className="bg-gradient-card border-border mb-6">
+          <CardHeader>
+            <CardTitle>Customer Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                {order.type === "Buy" ? "Customer Bank Details" : "Customer Wallet Address"}
+              </p>
+              <div className="p-3 bg-secondary/50 rounded-lg">
+                <p className="text-sm">{order.customerDetails}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Remarks</p>
-                <div className="p-3 bg-secondary/50 rounded-lg">
-                  <p className="text-sm">{order.remarks}</p>
-                </div>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Customer Remarks</p>
+              <div className="p-3 bg-secondary/50 rounded-lg">
+                <p className="text-sm">{order.remarks}</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Vendor Actions */}
-          <Card className="bg-gradient-card border-border">
+        {/* Vendor Actions */}
+        <Card className="bg-gradient-card border-border">
             <CardHeader>
               <CardTitle>Vendor Actions</CardTitle>
               <CardDescription>Choose your response to this order</CardDescription>
@@ -192,64 +207,66 @@ const OrderDetails = () => {
                   <span>Accept Order</span>
                 </h4>
                 
-                {/* Bank Details Option */}
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">Select Bank Account:</p>
-                  {bankAccounts.map((account) => (
-                    <div 
-                      key={account.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedAccount === account.id 
-                          ? 'border-primary bg-primary/10' 
-                          : 'border-border hover:bg-secondary/50'
-                      }`}
-                      onClick={() => setSelectedAccount(account.id)}
-                    >
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Building2 className="h-4 w-4" />
-                        <span className="font-medium">{account.name}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{account.bank} - {account.number}</p>
-                      <p className="text-sm">{account.accountName}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Contract Address Option */}
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">Or Select Contract Address:</p>
-                  {contractAddresses
-                    .filter(contract => contract.asset === order.asset)
-                    .map((contract) => (
-                    <div 
-                      key={contract.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedAccount === contract.id 
-                          ? 'border-primary bg-primary/10' 
-                          : 'border-border hover:bg-secondary/50'
-                      }`}
-                      onClick={() => setSelectedAccount(contract.id)}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
-                          <Wallet className="h-4 w-4" />
-                          <span className="font-medium">{contract.asset} - {contract.network}</span>
+                {order.type === "Buy" ? (
+                  /* Bank Details for Buy Orders */
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Select Bank Account to Send to Customer:</p>
+                    {bankAccounts.map((account) => (
+                      <div 
+                        key={account.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedAccount === account.id 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-border hover:bg-secondary/50'
+                        }`}
+                        onClick={() => setSelectedAccount(account.id)}
+                      >
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Building2 className="h-4 w-4" />
+                          <span className="font-medium">{account.name}</span>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyToClipboard(contract.address);
-                          }}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <p className="text-sm text-muted-foreground">{account.bank} - {account.number}</p>
+                        <p className="text-sm">{account.accountName}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground font-mono break-all">{contract.address}</p>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Contract Address for Sell Orders */
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Select Contract Address to Send to Customer:</p>
+                    {contractAddresses
+                      .filter(contract => contract.asset === order.asset)
+                      .map((contract) => (
+                      <div 
+                        key={contract.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedAccount === contract.id 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-border hover:bg-secondary/50'
+                        }`}
+                        onClick={() => setSelectedAccount(contract.id)}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-2">
+                            <Wallet className="h-4 w-4" />
+                            <span className="font-medium">{contract.asset} - {contract.network}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(contract.address);
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono break-all">{contract.address}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <Button 
                   onClick={handleAccept}
@@ -285,7 +302,6 @@ const OrderDetails = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
       </div>
     </Layout>
   );

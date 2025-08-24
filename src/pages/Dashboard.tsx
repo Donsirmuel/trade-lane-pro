@@ -2,7 +2,15 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRight, Clock, AlertCircle, TrendingUp, DollarSign, Activity } from "lucide-react";
+import { 
+  ArrowRight, 
+  Clock, 
+  AlertCircle, 
+  TrendingUp, 
+  DollarSign, 
+  Activity,
+  MessageSquare
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
@@ -82,29 +90,64 @@ const Dashboard = () => {
         <Card className="bg-gradient-card border-border">
           <CardHeader>
             <CardTitle>Latest Activity</CardTitle>
-            <CardDescription>Recent events and notifications</CardDescription>
+            <CardDescription>Recent broadcast messages and notifications</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {latestActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 rounded-full bg-primary"></div>
-                    <div>
-                      <p className="text-sm font-medium">{activity.message}</p>
-                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+            {/* Mock broadcast messages - in real app this would come from API */}
+            {[
+              {
+                id: 1,
+                message: "Currently experiencing high transaction volumes. Please allow extra time for processing. We appreciate your patience.",
+                shortMessage: "Currently experiencing high transaction volumes. Please allow extra time for processing...",
+                date: "2024-01-15 09:30:00"
+              },
+              {
+                id: 2,
+                message: "System maintenance scheduled for tonight 2:00 AM - 4:00 AM. All transactions will be processed after maintenance.",
+                shortMessage: "System maintenance scheduled for tonight 2:00 AM - 4:00 AM. All transactions will be processed...",
+                date: "2024-01-14 18:45:15"
+              }
+            ].length > 0 ? (
+              <div className="space-y-4">
+                {[
+                  {
+                    id: 1,
+                    message: "Currently experiencing high transaction volumes. Please allow extra time for processing. We appreciate your patience.",
+                    shortMessage: "Currently experiencing high transaction volumes. Please allow extra time for processing...",
+                    date: "2024-01-15 09:30:00"
+                  },
+                  {
+                    id: 2,
+                    message: "System maintenance scheduled for tonight 2:00 AM - 4:00 AM. All transactions will be processed after maintenance.",
+                    shortMessage: "System maintenance scheduled for tonight 2:00 AM - 4:00 AM. All transactions will be processed...",
+                    date: "2024-01-14 18:45:15"
+                  }
+                ].map((broadcast) => (
+                  <div key={broadcast.id} className="flex items-center space-x-3 p-3 bg-secondary/30 rounded-lg">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm">{broadcast.shortMessage}</p>
+                      <p className="text-xs text-muted-foreground">{broadcast.date}</p>
                     </div>
-                  </div>
-                  {activity.link !== "#" && (
-                    <Link to={activity.link}>
-                      <Button variant="ghost" size="sm">
-                        View
+                    <Link to="/broadcast-messages">
+                      <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
+                        Read More
                       </Button>
                     </Link>
-                  )}
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No recent broadcast messages</p>
+                <Link to="/broadcast-messages">
+                  <Button variant="outline" size="sm" className="mt-2 border-border">
+                    Send Broadcast Message
+                  </Button>
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -135,11 +178,11 @@ const Dashboard = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <TrendingUp className="h-4 w-4 text-crypto-blue" />
-                  <h4 className="text-sm font-medium">Assets Traded</h4>
+                  <h4 className="text-sm font-medium">Unique Assets Traded</h4>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">24.8 BTC</div>
-                  <div className="text-xs text-muted-foreground">+12% from last week</div>
+                  <div className="text-2xl font-bold">4</div>
+                  <div className="text-xs text-muted-foreground">+1 from last week</div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div className="bg-crypto-blue h-2 rounded-full" style={{ width: '75%' }}></div>
                   </div>
@@ -153,7 +196,7 @@ const Dashboard = () => {
                   <h4 className="text-sm font-medium">Value Traded</h4>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">$1,247,830</div>
+                  <div className="text-2xl font-bold">₦847M</div>
                   <div className="text-xs text-muted-foreground">+8% from last week</div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div className="bg-crypto-green h-2 rounded-full" style={{ width: '65%' }}></div>
