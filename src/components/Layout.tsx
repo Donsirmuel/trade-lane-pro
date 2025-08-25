@@ -7,7 +7,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -25,6 +26,7 @@ const Layout = ({ children, title }: LayoutProps) => {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Orders", href: "/orders", icon: ShoppingCart },
     { name: "Transactions", href: "/transactions", icon: ArrowLeftRight },
+    { name: "Queries", href: "/queries", icon: MessageCircle },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
 
