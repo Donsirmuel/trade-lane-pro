@@ -1,26 +1,46 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Smartphone, Laptop, Tablet, Monitor } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+  const { toast } = useToast();
+
+  // Get the intended destination from navigation state
+  const from = (location.state as any)?.from?.pathname || "/dashboard";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate login
-    setTimeout(() => {
+    try {
+      await login(email, password);
+      toast({
+        title: "Login Successful",
+        description: "Welcome back to Vendora!",
+        className: "bg-success text-success-foreground"
+      });
+      navigate(from, { replace: true });
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid credentials. Please try again.",
+        className: "bg-destructive text-destructive-foreground"
+      });
+    } finally {
       setIsLoading(false);
-      navigate("/dashboard");
-    }, 1000);
+    }
   };
 
   return (
@@ -98,6 +118,7 @@ const Login = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     className="bg-background border-border"
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -110,6 +131,7 @@ const Login = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     className="bg-background border-border"
+                    disabled={isLoading}
                   />
                 </div>
                 <Button
@@ -123,7 +145,7 @@ const Login = () => {
               
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Demo credentials: vendor@vendora.com / password
+                  Test credentials: test@vendor.com / testpass123
                 </p>
               </div>
             </CardContent>

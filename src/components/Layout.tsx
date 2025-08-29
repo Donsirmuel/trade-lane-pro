@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ interface LayoutProps {
 const Layout = ({ children, title }: LayoutProps) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -31,6 +33,10 @@ const Layout = ({ children, title }: LayoutProps) => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -58,6 +64,16 @@ const Layout = ({ children, title }: LayoutProps) => {
             </h1>
           </div>
 
+          {/* User Info */}
+          {user && (
+            <div className="px-4 py-3 border-b border-border">
+              <div className="text-sm">
+                <p className="font-medium text-foreground">{user.name}</p>
+                <p className="text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+          )}
+
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
             {navigation.map((item) => {
@@ -82,13 +98,14 @@ const Layout = ({ children, title }: LayoutProps) => {
 
           {/* Logout */}
           <div className="p-4 border-t border-border">
-            <Link
-              to="/"
-              className="flex items-center px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-secondary"
             >
               <LogOut className="mr-3 h-5 w-5" />
               Logout
-            </Link>
+            </Button>
           </div>
         </div>
       </div>

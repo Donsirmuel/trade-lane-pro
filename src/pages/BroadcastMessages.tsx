@@ -1,61 +1,139 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Send, MessageSquare, Calendar, Eye } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Send, MessageSquare, Calendar, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { createBroadcast, listBroadcasts, sendBroadcast, deleteBroadcast, BroadcastMessage } from "@/lib/broadcast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BroadcastMessages = () => {
   const { toast } = useToast();
-  const [message, setMessage] = useState("");
+  const { user } = useAuth();
+  const [title, setTitle] = useState("");
+  const [content, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<'asset_added' | 'rate_updated' | 'order_status' | 'general'>('general');
   const [isSending, setIsSending] = useState(false);
+  const [broadcasts, setBroadcasts] = useState<BroadcastMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Mock broadcast history
-  const broadcastHistory = [
-    {
-      id: 1,
-      message: "Currently experiencing high transaction volumes. Please allow extra time for processing. We appreciate your patience.",
-      date: "2024-01-15 09:30:00",
-      status: "Sent"
-    },
-    {
-      id: 2,
-      message: "System maintenance scheduled for tonight 2:00 AM - 4:00 AM. All transactions will be processed after maintenance.",
-      date: "2024-01-14 18:45:15",
-      status: "Sent"
-    },
-    {
-      id: 3,
-      message: "New payment method added: Zenith Bank. You can now receive payments through our Zenith account.",
-      date: "2024-01-13 14:20:30",
-      status: "Sent"
+  useEffect(() => {
+    loadBroadcasts();
+  }, [page]);
+
+  const loadBroadcasts = async () => {
+    try {
+      setIsLoading(true);
+      const response = await listBroadcasts(page);
+      if (page === 1) {
+        setBroadcasts(response.results);
+      } else {
+        setBroadcasts(prev => [...prev, ...response.results]);
+      }
+      setHasMore(!!response.next);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load broadcasts",
+        className: "bg-destructive text-destructive-foreground"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const handleSendBroadcast = async () => {
-    if (!message.trim()) {
+    if (!title.trim() || !content.trim()) {
       toast({
-        title: "Message Required",
-        description: "Please enter a message to broadcast.",
+        title: "Required Fields",
+        description: "Please enter both title and message content.",
         className: "bg-warning text-warning-foreground"
       });
       return;
     }
 
     setIsSending(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSending(false);
-      setMessage("");
+    try {
+      // Create the broadcast
+      const newBroadcast = await createBroadcast({
+        title: title.trim(),
+        content: content.trim(),
+        message_type: messageType
+      });
+
+      // Send it to the bot
+      const sendResult = await sendBroadcast(newBroadcast.id);
+      
+      if (sendResult.success) {
+        toast({
+          title: "Broadcast Sent",
+          description: "Your message has been sent to all customers successfully.",
+          className: "bg-success text-success-foreground"
+        });
+        
+        // Reset form
+        setTitle("");
+        setMessage("");
+        setMessageType('general');
+        
+        // Reload broadcasts
+        setPage(1);
+        await loadBroadcasts();
+      } else {
+        toast({
+          title: "Send Failed",
+          description: sendResult.error || "Failed to send broadcast to customers",
+          className: "bg-destructive text-destructive-foreground"
+        });
+      }
+    } catch (error: any) {
       toast({
-        title: "Broadcast Sent",
-        description: "Your message has been sent to all customers successfully.",
+        title: "Error",
+        description: error.message || "Failed to create or send broadcast",
+        className: "bg-destructive text-destructive-foreground"
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleDeleteBroadcast = async (id: number) => {
+    try {
+      await deleteBroadcast(id);
+      toast({
+        title: "Deleted",
+        description: "Broadcast message deleted successfully",
         className: "bg-success text-success-foreground"
       });
-    }, 2000);
+      setPage(1);
+      await loadBroadcasts();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete broadcast",
+        className: "bg-destructive text-destructive-foreground"
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  const getStatusBadge = (isSent: boolean) => {
+    return isSent ? (
+      <Badge className="bg-success/20 text-success">Sent</Badge>
+    ) : (
+      <Badge className="bg-warning/20 text-warning">Pending</Badge>
+    );
   };
 
   return (
@@ -88,20 +166,54 @@ const BroadcastMessages = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Type your broadcast message here..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              className="bg-background border-border resize-none"
-            />
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                {message.length}/500 characters
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  placeholder="Enter message title..."
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="bg-background border-border"
+                  maxLength={100}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="type">Message Type</Label>
+                <Select value={messageType} onValueChange={(value: any) => setMessageType(value)}>
+                  <SelectTrigger className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="asset_added">Asset Added</SelectItem>
+                    <SelectItem value="rate_updated">Rate Updated</SelectItem>
+                    <SelectItem value="order_status">Order Status</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="content">Message Content</Label>
+              <Textarea
+                id="content"
+                placeholder="Type your broadcast message here..."
+                value={content}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={4}
+                className="bg-background border-border resize-none"
+                maxLength={500}
+              />
+              <p className="text-sm text-muted-foreground text-right">
+                {content.length}/500 characters
               </p>
+            </div>
+            
+            <div className="flex justify-end">
               <Button 
                 onClick={handleSendBroadcast}
-                disabled={isSending || !message.trim()}
+                disabled={isSending || !title.trim() || !content.trim()}
                 className="bg-gradient-primary hover:opacity-90"
               >
                 <Send className="h-4 w-4 mr-2" />
@@ -123,33 +235,49 @@ const BroadcastMessages = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {broadcastHistory.length > 0 ? (
+            {broadcasts.length > 0 ? (
               <div className="space-y-4">
-                {broadcastHistory.map((broadcast) => (
+                {broadcasts.map((broadcast) => (
                   <div key={broadcast.id} className="border border-border rounded-lg p-4 bg-secondary/20">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{broadcast.date}</span>
+                        <span className="text-sm text-muted-foreground">{formatDate(broadcast.created_at)}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {broadcast.message_type.replace('_', ' ')}
+                        </Badge>
                       </div>
-                      <Badge className="bg-success/20 text-success">
-                        {broadcast.status}
-                      </Badge>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(broadcast.is_sent)}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteBroadcast(broadcast.id)}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm mb-3">{broadcast.message}</p>
-                    <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-                      <Eye className="h-3 w-3 mr-1" />
-                      View Details
-                    </Button>
+                    <h4 className="font-medium mb-2">{broadcast.title}</h4>
+                    <p className="text-sm text-muted-foreground mb-3">{broadcast.content}</p>
                   </div>
                 ))}
                 
-                {/* Pagination would go here for real implementation */}
-                <div className="flex justify-center pt-4">
-                  <Button variant="outline" size="sm" className="border-border">
-                    Load More Messages
-                  </Button>
-                </div>
+                {/* Load More */}
+                {hasMore && (
+                  <div className="flex justify-center pt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-border"
+                      onClick={() => setPage(prev => prev + 1)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Loading..." : "Load More Messages"}
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
