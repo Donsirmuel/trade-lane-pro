@@ -1,52 +1,160 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { 
+  ShoppingCart, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle,
+  Search,
+  Filter,
+  Plus
+} from "lucide-react";
+import { listOrders, Order } from "@/lib/orders";
+import { useToast } from "@/hooks/use-toast";
 
 const Orders = () => {
-  const [currentPage, setCurrentPage] = useState(1);
+  const { toast } = useToast();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [assetFilter, setAssetFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Mock data
-  const orders = [
-    { id: "ORD001", date: "2024-01-15 14:30", asset: "BTC", amount: "0.5", value: "$23,500", type: "Buy", elapsed: "5 minutes ago" },
-    { id: "ORD002", date: "2024-01-15 14:25", asset: "ETH", amount: "2.0", value: "$5,200", type: "Sell", elapsed: "10 minutes ago" },
-    { id: "ORD003", date: "2024-01-15 14:20", asset: "BTC", amount: "1.2", value: "$56,400", type: "Buy", elapsed: "15 minutes ago" },
-    { id: "ORD004", date: "2024-01-15 14:15", asset: "USDT", amount: "10,000", value: "$10,000", type: "Sell", elapsed: "20 minutes ago" },
-    { id: "ORD005", date: "2024-01-15 14:10", asset: "ETH", amount: "5.0", value: "$13,000", type: "Buy", elapsed: "25 minutes ago" },
-    { id: "ORD006", date: "2024-01-15 14:05", asset: "BTC", amount: "0.8", value: "$37,600", type: "Sell", elapsed: "30 minutes ago" },
-  ];
+  useEffect(() => {
+    loadOrders();
+  }, [page]);
 
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(orders.length / itemsPerPage);
+  useEffect(() => {
+    filterOrders();
+  }, [orders, searchTerm, statusFilter]);
 
-  const getTypeColor = (type: string) => {
-    return type === "Buy" ? "bg-crypto-green/20 text-crypto-green" : "bg-crypto-red/20 text-crypto-red";
-  };
-
-  const getAssetColor = (asset: string) => {
-    switch (asset) {
-      case "BTC": return "bg-crypto-gold/20 text-crypto-gold";
-      case "ETH": return "bg-crypto-blue/20 text-crypto-blue";
-      case "USDT": return "bg-crypto-green/20 text-crypto-green";
-      default: return "bg-secondary text-secondary-foreground";
+  const loadOrders = async () => {
+    try {
+      setIsLoading(true);
+      const response = await listOrders(page);
+      
+      if (page === 1) {
+        setOrders(response.results);
+      } else {
+        setOrders(prev => [...prev, ...response.results]);
+      }
+      
+      setHasMore(!!response.next);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load orders",
+        className: "bg-destructive text-destructive-foreground"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const filterOrders = () => {
+    let filtered = [...orders];
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(order => 
+        order.asset.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.order_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.amount.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredOrders(filtered);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: { [key: string]: { color: string; icon: any; text: string } } = {
+      pending: { color: "bg-yellow-100 text-yellow-800", icon: Clock, text: "Pending" },
+      accepted: { color: "bg-blue-100 text-blue-800", icon: CheckCircle, text: "Accepted" },
+      declined: { color: "bg-red-100 text-red-800", icon: XCircle, text: "Declined" },
+      expired: { color: "bg-gray-100 text-gray-800", icon: AlertCircle, text: "Expired" },
+      completed: { color: "bg-green-100 text-green-800", icon: CheckCircle, text: "Completed" }
+    };
+    
+    const config = statusConfig[status] || statusConfig.pending;
+    const Icon = config.icon;
+    
+    return (
+      <Badge className={config.color}>
+        <Icon className="h-3 w-3 mr-1" />
+        {config.text}
+      </Badge>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  const getOrderTypeIcon = (type: string) => {
+    return type === 'buy' ? (
+      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+        <span className="text-green-600 font-semibold text-sm">B</span>
+      </div>
+    ) : (
+      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+        <span className="text-red-600 font-semibold text-sm">S</span>
+      </div>
+    );
+  };
+
+  const handleRefresh = () => {
+    setPage(1);
+    setSearchTerm("");
+    setStatusFilter("all");
+    loadOrders();
+  };
+
+  if (isLoading && page === 1) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading orders...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
-    <Layout title="Incoming Orders">
+    <Layout>
       <div className="space-y-6">
-        
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Orders</h1>
+            <p className="text-muted-foreground">
+              Manage customer orders and track their status
+            </p>
+          </div>
+          <Button onClick={handleRefresh} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+
         {/* Filters */}
-        <Card className="bg-gradient-card border-border">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Filter className="h-5 w-5" />
@@ -54,141 +162,149 @@ const Orders = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search orders..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-background border-border"
-                />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search orders..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
               
-              <Select value={assetFilter} onValueChange={setAssetFilter}>
-                <SelectTrigger className="bg-background border-border">
-                  <SelectValue placeholder="Asset" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Assets</SelectItem>
-                  <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
-                  <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
-                  <SelectItem value="USDT">Tether (USDT)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="bg-background border-border">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Buy">Buy Orders</SelectItem>
-                  <SelectItem value="Sell">Sell Orders</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" className="border-border">
-                Clear Filters
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Orders Table */}
-        <Card className="bg-gradient-card border-border">
-          <CardHeader>
-            <CardTitle>Pending Orders ({orders.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Asset</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Time Elapsed</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id} className="border-border hover:bg-secondary/50">
-                      <TableCell>
-                        <Link 
-                          to={`/orders/${order.id}`}
-                          className="text-primary hover:text-primary/80 font-medium"
-                        >
-                          {order.id}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{order.date}</TableCell>
-                      <TableCell>
-                        <Badge className={getAssetColor(order.asset)}>
-                          {order.asset}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{order.amount}</TableCell>
-                      <TableCell className="font-semibold">{order.value}</TableCell>
-                      <TableCell>
-                        <Badge className={getTypeColor(order.type)}>
-                          {order.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{order.elapsed}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-6">
-              <p className="text-sm text-muted-foreground">
-                Showing {Math.min((currentPage - 1) * itemsPerPage + 1, orders.length)} to{" "}
-                {Math.min(currentPage * itemsPerPage, orders.length)} of {orders.length} orders
-              </p>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="border-border"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className={currentPage === page ? "bg-primary" : "border-border"}
-                    >
-                      {page}
-                    </Button>
-                  ))}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="declined">Declined</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Results</label>
+                <div className="text-sm text-muted-foreground pt-2">
+                  {filteredOrders.length} of {orders.length} orders
                 </div>
-                <Button
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="border-border"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Orders List */}
+        <div className="space-y-4">
+          {filteredOrders.length > 0 ? (
+            filteredOrders.map((order) => (
+              <Card key={order.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4">
+                      {getOrderTypeIcon(order.order_type)}
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-3">
+                          <h3 className="font-semibold text-lg">
+                            {order.asset} {order.order_type.toUpperCase()}
+                          </h3>
+                          {getStatusBadge(order.status)}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Amount:</span>
+                            <p className="font-medium">{order.amount} {order.asset}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Rate:</span>
+                            <p className="font-medium">${order.rate}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Total Value:</span>
+                            <p className="font-medium">${order.total_value}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Created:</span>
+                            <p className="font-medium">{formatDate(order.created_at)}</p>
+                          </div>
+                        </div>
+                        
+                        {order.rejection_reason && (
+                          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-red-700">
+                              <strong>Rejection Reason:</strong> {order.rejection_reason}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-2">
+                      <Link to={`/orders/${order.id}`}>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </Link>
+                      
+                      {order.status === 'pending' && (
+                        <div className="flex space-x-2">
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                            Accept
+                          </Button>
+                          <Button size="sm" variant="destructive">
+                            Decline
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">No orders found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm || statusFilter !== "all" 
+                    ? "Try adjusting your filters or search terms"
+                    : "Orders will appear here when customers place them"
+                  }
+                </p>
+                {(searchTerm || statusFilter !== "all") && (
+                  <Button onClick={handleRefresh} variant="outline">
+                    Clear Filters
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Load More */}
+        {hasMore && (
+          <div className="flex justify-center">
+            <Button 
+              onClick={() => setPage(prev => prev + 1)}
+              disabled={isLoading}
+              variant="outline"
+            >
+              {isLoading ? "Loading..." : "Load More Orders"}
+            </Button>
+          </div>
+        )}
       </div>
     </Layout>
   );
