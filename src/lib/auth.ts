@@ -7,34 +7,29 @@ export interface LoginCredentials {
 
 export interface SignupCredentials {
   email: string;
+  name: string;
   password: string;
   password_confirm: string;
-  name: string;
-  bank_details?: string;
 }
 
 export interface LoginResponse {
   access: string;
   refresh: string;
+  user?: {
+    id: number;
+    email: string;
+    name: string;
+    is_available: boolean;
+  };
 }
 
 export interface SignupResponse {
   message: string;
-  vendor: VendorProfile;
-}
-
-export interface PasswordResetRequest {
-  email: string;
-}
-
-export interface PasswordResetConfirm {
-  token: string;
-  password: string;
-  password_confirm: string;
-}
-
-export interface PasswordResetResponse {
-  message: string;
+  user: {
+    id: number;
+    email: string;
+    name: string;
+  };
 }
 
 export interface VendorProfile {
@@ -46,21 +41,37 @@ export interface VendorProfile {
   is_staff: boolean;
   is_superuser: boolean;
   is_active: boolean;
-  date_joined: string;
-  last_login: string | null;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirm {
+  uid: string;
+  token: string;
+  new_password: string;
 }
 
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   try {
-    const response = await http.post<LoginResponse>('/api/v1/accounts/token/', credentials);
+    const response = await http.post<LoginResponse>('/api/v1/accounts/token/', {
+      email: credentials.email,
+      password: credentials.password
+    });
     const tokens = response.data;
 
     // Store tokens
-    tokenStore.set(tokens);
-    
+    tokenStore.set({
+      access: tokens.access,
+      refresh: tokens.refresh
+    });
+
     return tokens;
   } catch (error: any) {
-    const message = error.response?.data?.detail || 'Login failed';
+    const message = error.response?.data?.detail || 
+                   Object.values(error.response?.data || {}).flat().join(', ') ||
+                   'Login failed';
     throw new Error(message);
   }
 }
@@ -70,65 +81,30 @@ export async function signup(credentials: SignupCredentials): Promise<SignupResp
     const response = await http.post<SignupResponse>('/api/v1/accounts/signup/', credentials);
     return response.data;
   } catch (error: any) {
-    // Handle validation errors
-    if (error.response?.data) {
-      const errorData = error.response.data;
-      
-      // If it's a validation error with field-specific messages
-      if (typeof errorData === 'object' && !errorData.detail) {
-        const firstFieldError = Object.values(errorData)[0];
-        const message = Array.isArray(firstFieldError) ? firstFieldError[0] : firstFieldError;
-        throw new Error(message as string);
-      }
-      
-      // If it's a detail error message
-      if (errorData.detail) {
-        throw new Error(errorData.detail);
-      }
-      
-      // If it's a non_field_errors array
-      if (errorData.non_field_errors && Array.isArray(errorData.non_field_errors)) {
-        throw new Error(errorData.non_field_errors[0]);
-      }
-    }
-    
-    throw new Error('Signup failed. Please try again.');
-  }
-}
-
-export async function requestPasswordReset(email: string): Promise<PasswordResetResponse> {
-  try {
-    const response = await http.post<PasswordResetResponse>('/api/v1/accounts/password-reset/', { email });
-    return response.data;
-  } catch (error: any) {
-    const message = error.response?.data?.detail || error.response?.data?.email?.[0] || 'Password reset request failed';
+    const message = error.response?.data?.detail || 
+                   Object.values(error.response?.data || {}).flat().join(', ') ||
+                   'Signup failed';
     throw new Error(message);
   }
 }
 
-export async function confirmPasswordReset(data: PasswordResetConfirm): Promise<PasswordResetResponse> {
+export async function requestPasswordReset(data: PasswordResetRequest): Promise<{message: string}> {
   try {
-    const response = await http.post<PasswordResetResponse>('/api/v1/accounts/password-reset/confirm/', data);
+    const response = await http.post('/api/v1/accounts/password-reset/', data);
     return response.data;
   } catch (error: any) {
-    // Handle validation errors
-    if (error.response?.data) {
-      const errorData = error.response.data;
-      
-      // If it's a validation error with field-specific messages
-      if (typeof errorData === 'object' && !errorData.detail) {
-        const firstFieldError = Object.values(errorData)[0];
-        const message = Array.isArray(firstFieldError) ? firstFieldError[0] : firstFieldError;
-        throw new Error(message as string);
-      }
-      
-      // If it's a detail error message
-      if (errorData.detail) {
-        throw new Error(errorData.detail);
-      }
-    }
-    
-    throw new Error('Password reset failed. Please try again.');
+    const message = error.response?.data?.detail || 'Failed to send reset email';
+    throw new Error(message);
+  }
+}
+
+export async function confirmPasswordReset(data: PasswordResetConfirm): Promise<{message: string}> {
+  try {
+    const response = await http.post('/api/v1/accounts/password-reset/confirm/', data);
+    return response.data;
+  } catch (error: any) {
+    const message = error.response?.data?.detail || 'Failed to reset password';
+    throw new Error(message);
   }
 }
 
@@ -163,36 +139,4 @@ export async function updateVendorProfile(updates: Partial<VendorProfile>): Prom
     const message = error.response?.data?.detail || 'Failed to update profile';
     throw new Error(message);
   }
-}
-
-// Utility function to validate email format
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-// Utility function to validate password strength
-export function validatePassword(password: string): { isValid: boolean; message?: string } {
-  if (password.length < 8) {
-    return { isValid: false, message: 'Password must be at least 8 characters long' };
-  }
-  
-  if (!/(?=.*[a-z])/.test(password)) {
-    return { isValid: false, message: 'Password must contain at least one lowercase letter' };
-  }
-  
-  if (!/(?=.*[A-Z])/.test(password)) {
-    return { isValid: false, message: 'Password must contain at least one uppercase letter' };
-  }
-  
-  if (!/(?=.*\d)/.test(password)) {
-    return { isValid: false, message: 'Password must contain at least one number' };
-  }
-  
-  return { isValid: true };
-}
-
-// Utility function to check if passwords match
-export function passwordsMatch(password: string, confirmPassword: string): boolean {
-  return password === confirmPassword;
 }
