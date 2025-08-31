@@ -56,7 +56,7 @@ export interface PasswordResetConfirm {
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   try {
     const response = await http.post<LoginResponse>('/api/v1/accounts/token/', {
-      email: credentials.email,
+      username: credentials.email,  // Django JWT expects 'username' field
       password: credentials.password
     });
     const tokens = response.data;
@@ -139,4 +139,36 @@ export async function updateVendorProfile(updates: Partial<VendorProfile>): Prom
     const message = error.response?.data?.detail || 'Failed to update profile';
     throw new Error(message);
   }
+}
+
+// Utility function to validate email format
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+// Utility function to validate password strength
+export function validatePassword(password: string): { isValid: boolean; message?: string } {
+  if (password.length < 8) {
+    return { isValid: false, message: 'Password must be at least 8 characters long' };
+  }
+  
+  if (!/(?=.*[a-z])/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one lowercase letter' };
+  }
+  
+  if (!/(?=.*[A-Z])/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one uppercase letter' };
+  }
+  
+  if (!/(?=.*\d)/.test(password)) {
+    return { isValid: false, message: 'Password must contain at least one number' };
+  }
+  
+  return { isValid: true };
+}
+
+// Utility function to check if passwords match
+export function passwordsMatch(password: string, confirmPassword: string): boolean {
+  return password === confirmPassword;
 }

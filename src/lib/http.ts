@@ -1,100 +1,116 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
-const JWT_KEY = import.meta.env.VITE_JWT_STORAGE_KEY || 'vendora_jwt';
+// Token interface
+export interface Tokens {
+  access: string;
+  refresh: string;
+}
 
-export type Tokens = { 
-  access: string; 
-  refresh: string; 
-};
+// Token storage utilities
+class TokenStorage {
+  private readonly ACCESS_TOKEN_KEY = 'vendora_access_token';
+  private readonly REFRESH_TOKEN_KEY = 'vendora_refresh_token';
 
-export const tokenStore = {
+  set(tokens: Tokens): void {
+    localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.access);
+    localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refresh);
+  }
+
   get(): Tokens | null {
-    try {
-      const raw = localStorage.getItem(JWT_KEY);
-      return raw ? JSON.parse(raw) as Tokens : null;
-    } catch {
-      return null;
+    const access = localStorage.getItem(this.ACCESS_TOKEN_KEY);
+    const refresh = localStorage.getItem(this.REFRESH_TOKEN_KEY);
+    
+    if (access && refresh) {
+      return { access, refresh };
     }
-  },
-  
-  set(tokens: Tokens) {
-    localStorage.setItem(JWT_KEY, JSON.stringify(tokens));
-  },
-  
-  clear() {
-    localStorage.removeItem(JWT_KEY);
+    
+    return null;
   }
-};
 
-export const http = axios.create({
-  baseURL: API_BASE,
-  headers: { 'Content-Type': 'application/json' },
+  clear(): void {
+    localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+  }
+
+  getAccessToken(): string | null {
+    return localStorage.getItem(this.ACCESS_TOKEN_KEY);
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+  }
+}
+
+export const tokenStore = new TokenStorage();
+
+// Create axios instance
+const http = axios.create({
+  baseURL: 'http://localhost:8000',
   timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-// Add auth token to requests
-http.interceptors.request.use((config) => {
-  const tokens = tokenStore.get();
-  if (tokens?.access) {
-    config.headers = config.headers ?? {};
-    (config.headers as any).Authorization = `Bearer ${tokens.access}`;
-  }
-  return config;
-});
-
-// Handle 401 responses with token refresh
-let isRefreshing = false;
-let queue: Array<() => void> = [];
-
-http.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const { response, config } = error || {};
-    
-    if (response?.status === 401 && !config._retry) {
-      if (isRefreshing) {
-        // Wait for current refresh to complete
-        await new Promise<void>((resolve) => queue.push(resolve));
-        return http(config);
-      }
-      
-      config._retry = true;
-      isRefreshing = true;
-      
-      try {
-        const tokens = tokenStore.get();
-        if (!tokens?.refresh) {
-          throw new Error('No refresh token');
-        }
-        
-        const refreshResponse = await axios.post(`${API_BASE}/api/v1/accounts/token/refresh/`, {
-          refresh: tokens.refresh
-        });
-        
-        const newTokens = { 
-          access: refreshResponse.data.access, 
-          refresh: tokens.refresh 
-        };
-        tokenStore.set(newTokens);
-        
-        // Resolve all queued requests
-        queue.forEach((fn) => fn());
-        queue = [];
-        
-        return http(config);
-      } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
-        tokenStore.clear();
-        window.location.href = '/';
-        throw refreshError;
-      } finally {
-        isRefreshing = false;
-      }
+// Request interceptor to add auth token
+http.interceptors.request.use(
+  (config) => {
+    const token = tokenStore.getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    throw error;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
 );
 
+// Response interceptor to handle token refresh
+http.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If token is expired and we haven't already tried to refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const refreshToken = tokenStore.getRefreshToken();
+      if (refreshToken) {
+        try {
+          const refreshResponse = await axios.post('http://localhost:8000/api/v1/accounts/token/refresh/', {
+            refresh: refreshToken,
+          });
+
+          const newTokens = {
+            access: refreshResponse.data.access,
+            refresh: refreshToken, // Keep the same refresh token
+          };
+
+          tokenStore.set(newTokens);
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${newTokens.access}`;
+          return http(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed, clear tokens and redirect to login
+          tokenStore.clear();
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        }
+      } else {
+        // No refresh token, redirect to login
+        tokenStore.clear();
+        window.location.href = '/login';
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export { http };
 export default http;
