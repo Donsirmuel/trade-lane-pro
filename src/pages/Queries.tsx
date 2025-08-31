@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,95 +6,54 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, MessageCircle, Clock, CheckCircle2, AlertCircle } from "lucide-react";
+import { http } from "@/lib/http";
 
 const Queries = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock queries data
-  const mockQueries = [
-    {
-      id: "Q001",
-      customerName: "John Doe",
-      email: "john.doe@email.com",
-      subject: "Payment not received",
-      message: "I made the payment 2 hours ago but my order is still showing as pending. Please check and confirm.",
-      status: "Open",
-      priority: "High",
-      createdAt: "2024-01-14 16:30:00",
-      orderRef: "TX001"
-    },
-    {
-      id: "Q002", 
-      customerName: "Jane Smith",
-      email: "jane.smith@email.com",
-      subject: "Wrong contract address",
-      message: "I think I sent the cryptocurrency to the wrong address. Can you please help me verify?",
-      status: "Resolved",
-      priority: "Medium",
-      createdAt: "2024-01-14 14:15:00",
-      orderRef: "TX002"
-    },
-    {
-      id: "Q003",
-      customerName: "Mike Johnson", 
-      email: "mike.j@email.com",
-      subject: "Order cancellation request",
-      message: "I need to cancel my order due to urgent circumstances. Please advise on the process.",
-      status: "In Progress",
-      priority: "Medium",
-      createdAt: "2024-01-14 12:45:00",
-      orderRef: "TX003"
-    },
-    {
-      id: "Q004",
-      customerName: "Sarah Wilson",
-      email: "sarah.w@email.com", 
-      subject: "Rate inquiry",
-      message: "What are your current rates for ETH? The website is showing different rates.",
-      status: "Open",
-      priority: "Low",
-      createdAt: "2024-01-14 11:20:00",
-      orderRef: null
-    }
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await http.get<{results: any[]}>("/api/v1/queries/");
+        setItems(res.data.results || []);
+      } catch (e) {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Open": return "bg-warning/20 text-warning";
-      case "In Progress": return "bg-primary/20 text-primary";
-      case "Resolved": return "bg-crypto-green/20 text-crypto-green";
+      case "pending": return "bg-warning/20 text-warning";
+      case "replied": return "bg-primary/20 text-primary";
+      case "resolved": return "bg-crypto-green/20 text-crypto-green";
       default: return "bg-secondary text-secondary-foreground";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "Open": return <AlertCircle className="h-4 w-4" />;
-      case "In Progress": return <Clock className="h-4 w-4" />;
-      case "Resolved": return <CheckCircle2 className="h-4 w-4" />;
+      case "pending": return <AlertCircle className="h-4 w-4" />;
+      case "replied": return <Clock className="h-4 w-4" />;
+      case "resolved": return <CheckCircle2 className="h-4 w-4" />;
       default: return <MessageCircle className="h-4 w-4" />;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High": return "bg-destructive/20 text-destructive";
-      case "Medium": return "bg-warning/20 text-warning";
-      case "Low": return "bg-secondary text-secondary-foreground";
-      default: return "bg-secondary text-secondary-foreground";
-    }
-  };
+  // No priority on backend model currently
 
-  const filteredQueries = mockQueries.filter(query => {
-    const matchesSearch = query.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         query.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         query.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || query.status.toLowerCase() === statusFilter.toLowerCase();
-    const matchesPriority = priorityFilter === "all" || query.priority.toLowerCase() === priorityFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus && matchesPriority;
+  const filteredQueries = items.filter((q) => {
+    const derivedStatus = q.reply && String(q.reply).trim().length > 0 ? "replied" : "pending";
+    const matchesSearch = (q.message || "").toLowerCase().includes(searchTerm.toLowerCase()) || String(q.id).includes(searchTerm);
+    const matchesStatus = statusFilter === "all" || derivedStatus === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -107,10 +66,10 @@ const Queries = () => {
         </div>
 
         {/* Filters */}
-        <Card className="bg-gradient-card border-border">
+  <Card className="bg-gradient-card border-border">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter queries by search term, status, and priority</CardDescription>
+            <CardDescription>Filter queries by search term and status</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -123,98 +82,81 @@ const Queries = () => {
                   className="pl-10 bg-background border-border"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="bg-background border-border">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="replied">Replied</SelectItem>
+          <SelectItem value="resolved">Resolved</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="bg-background border-border">
-                  <SelectValue placeholder="Filter by priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+        <div />
             </div>
           </CardContent>
         </Card>
 
         {/* Queries List */}
         <div className="space-y-4">
-          {filteredQueries.map((query) => (
+          {loading ? (
+            <Card className="bg-gradient-card border-border">
+              <CardContent className="text-center py-12 text-muted-foreground">Loading queries…</CardContent>
+            </Card>
+          ) : filteredQueries.length > 0 ? (
+            filteredQueries.map((query) => (
             <Card key={query.id} className="bg-gradient-card border-border hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold">{query.subject}</h3>
-                      <Badge className={getPriorityColor(query.priority)} variant="secondary">
-                        {query.priority}
-                      </Badge>
+                        <h3 className="font-semibold">Customer Query</h3>
                     </div>
                     <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      <span>Query ID: {query.id}</span>
-                      <span>From: {query.customerName}</span>
-                      <span>{query.email}</span>
-                      {query.orderRef && <span>Order: {query.orderRef}</span>}
+                        <span>Query ID: {query.id}</span>
+                        {query.order && <span>Order: {query.order}</span>}
                     </div>
                   </div>
-                  <Badge className={getStatusColor(query.status)}>
-                    {getStatusIcon(query.status)}
-                    <span className="ml-1">{query.status}</span>
-                  </Badge>
+                  {(() => {
+                    const status = query.reply && String(query.reply).trim().length > 0 ? "replied" : "pending";
+                    return (
+                      <Badge className={getStatusColor(status)}>
+                        {getStatusIcon(status)}
+                        <span className="ml-1">{status}</span>
+                      </Badge>
+                    );
+                  })()}
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <p className="text-sm">{query.message}</p>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">
-                      Created: {query.createdAt}
-                    </span>
+                      <span className="text-sm text-muted-foreground">Created: {new Date(query.created_at || query.timestamp || Date.now()).toLocaleString()}</span>
                     <div className="space-x-2">
                       <Button variant="outline" size="sm" className="border-border">
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Reply
                       </Button>
-                      {query.status !== "Resolved" && (
-                        <Button variant="default" size="sm">
-                          Mark Resolved
-                        </Button>
-                      )}
+                      {/* Optionally implement a reply dialog and PATCH /queries/:id to set reply */}
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
+            ))) : (
+            <Card className="bg-gradient-card border-border">
+              <CardContent className="text-center py-12">
+                <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-semibold mb-2">No queries found</h3>
+                <p className="text-muted-foreground">{searchTerm || statusFilter !== "all" ? "Try adjusting your filters." : "No customer queries available."}</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* No Results */}
-        {filteredQueries.length === 0 && (
-          <Card className="bg-gradient-card border-border">
-            <CardContent className="text-center py-12">
-              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No queries found</h3>
-              <p className="text-muted-foreground">
-                {searchTerm || statusFilter !== "all" || priorityFilter !== "all" 
-                  ? "Try adjusting your filters to see more results."
-                  : "No customer queries available at the moment."
-                }
-              </p>
-            </CardContent>
-          </Card>
-        )}
+  {/* No Results handled above */}
       </div>
     </Layout>
   );
