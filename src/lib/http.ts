@@ -45,7 +45,7 @@ export const tokenStore = new TokenStorage();
 
 // Create axios instance
 const http = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -81,7 +81,8 @@ http.interceptors.response.use(
       const refreshToken = tokenStore.getRefreshToken();
       if (refreshToken) {
         try {
-          const refreshResponse = await axios.post('http://localhost:8000/api/v1/accounts/token/refresh/', {
+          const baseURL = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000';
+          const refreshResponse = await axios.post(`${baseURL}/api/v1/accounts/token/refresh/`, {
             refresh: refreshToken,
           });
 

@@ -56,7 +56,7 @@ export interface PasswordResetConfirm {
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   try {
     const response = await http.post<LoginResponse>('/api/v1/accounts/token/', {
-      username: credentials.email,  // Django JWT expects 'username' field
+      email: credentials.email,  // Backend expects 'email' field
       password: credentials.password
     });
     const tokens = response.data;
